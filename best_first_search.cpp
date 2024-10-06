@@ -1,3 +1,17 @@
+#include <iostream> 
+#include <vector> 
+#include <limits.h> 
+#include <set> 
+using namespace std; 
+
+// Function to convert a string to lowercase
+string convertToLowerCase(string input) 
+{ 
+    for (int index = 0; index < input.length(); index++) 
+    { 
+        if (input[index] >= 'A' && input[index] <= 'Z') 
+        { 
+            input[index] = input[index] - 'A' + 'a'; 
  } 
     } 
     return input; 
