@@ -2,12 +2,13 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <limits.h>
 using namespace std;
 
-int board[9];  // Array representing the board (1-9)
-int turn = 1;  // Tracks the current turn
+int board[9]; 
+int turn = 1; // Tracks the current turn
 
-// Function to display the Tic-Tac-Toe board
+// Display the Tic-Tac-Toe board
 void display_table() {
     cout << "+---+---+---+\n";
     for (int i = 0; i < 9; i++) {
@@ -15,9 +16,9 @@ void display_table() {
         if (board[i] == 2) {
             cout << " ";  // Empty
         } else if (board[i] == 3) {
-            cout << "X";  // User
+            cout << "O";  // User
         } else if (board[i] == 5) {
-            cout << "O";  // Computer
+            cout << "X";  // Computer
         }
         if (i % 3 == 2) {
             cout << " |\n+---+---+---+\n";
@@ -25,21 +26,14 @@ void display_table() {
     }
 }
 
-// Function to convert a position (1-9) to coordinates (row, col)
-pair<int, int> get_coordinates_from_position(int position) {
-    int row = (position - 1) / 3; 
-    int col = (position - 1) % 3; 
-    return {row, col};
-}
-
-// Function to check if a player has won by multiplying squares in rows/cols/diags
-bool check_winner(int player) {
+// Function to check if a player has won
+bool check_winner(int mark) {
     int win_combinations[8][3] = {
         {0, 1, 2}, {3, 4, 5}, {6, 7, 8},  // Rows
         {0, 3, 6}, {1, 4, 7}, {2, 5, 8},  // Columns
         {0, 4, 8}, {2, 4, 6}              // Diagonals
     };
-    int product = (player == 1) ? 27 : 125;  // For 'X' (3^3) and 'O' (5^3)
+    int product = (mark == 5) ? 125 : 27;  // Computer (5^3) or User (3^3)
     
     for (auto &comb : win_combinations) {
         if (board[comb[0]] * board[comb[1]] * board[comb[2]] == product) {
@@ -49,124 +43,143 @@ bool check_winner(int player) {
     return false;
 }
 
-// Function to find a winning move or block the opponent's winning move
-int posswin(int mark) {
-    int win_combinations[8][3] = {
-        {0, 1, 2}, {3, 4, 5}, {6, 7, 8},  // Rows
-        {0, 3, 6}, {1, 4, 7}, {2, 5, 8},  // Columns
-        {0, 4, 8}, {2, 4, 6}              // Diagonals
-    };
-    
-    for (auto &comb : win_combinations) {
-        int product = board[comb[0]] * board[comb[1]] * board[comb[2]];
-        if (product == mark * mark * 2) {
-            // Find the empty spot (which has value 2)
-            for (int i : comb) {
-                if (board[i] == 2) {
-                    return i + 1;  // Return 1-based position
-                }
+// Heuristic evaluation of the board for Minimax
+int rate() {
+    int score = 0;
+
+    // Center control
+    if (board[4] == 5) score += 4;  
+    if (board[4] == 3) score -= 4;  
+
+    // Corner control
+    int corners[4] = {0, 2, 6, 8};
+    for (int c : corners) {
+        if (board[c] == 5) score += 3;
+        if (board[c] == 3) score -= 3;
+    }
+    int edges[4] = {1, 3, 5, 7};
+    for (int e : edges) {
+        if (board[e] == 5) score += 1;  
+        if (board[e] == 3) score -= 1;  
+    }
+
+    return score;
+}
+
+// Minimax algorithm
+int minimax(int depth, bool isMaximizing) {
+    if (check_winner(5)) return 10;  // Computer wins
+    if (check_winner(3)) return -10; // User wins
+
+    bool isDraw = true;
+    for (int i = 0; i < 9; ++i) {
+        if (board[i] == 2) {
+            isDraw = false;
+            break;
+        }
+    }
+    if (isDraw) return 0; 
+
+    if (depth >= 5) return rate(); // Limit depth for efficiency
+
+    if (isMaximizing) {
+        int bestScore = INT_MIN;
+        for (int i = 0; i < 9; ++i) {
+            if (board[i] == 2) {
+                board[i] = 5; // Simulate computer move
+                bestScore = max(bestScore, minimax(depth + 1, false));
+                board[i] = 2; // Undo move
+            }
+        }
+        return bestScore;
+    } else {
+        int bestScore = INT_MAX;
+        for (int i = 0; i < 9; ++i) {
+            if (board[i] == 2) {
+                board[i] = 3; // Simulate user move
+                bestScore = min(bestScore, minimax(depth + 1, true));
+                board[i] = 2; // Undo move
+            }
+        }
+        return bestScore;
+    }
+}
+
+// Computer's move using Minimax
+int get_computer_move() {
+    int bestMove = -1, bestScore = INT_MIN;
+
+    for (int i = 0; i < 9; ++i) {
+        if (board[i] == 2) {
+            board[i] = 5; // Simulate move
+            int score = minimax(0, false);
+            board[i] = 2; // Undo move
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = i + 1; // Convert 0-based to 1-based
             }
         }
     }
-    return 0;
+
+    return bestMove;
 }
 
-// Function to handle moves for both user and computer
+// Execute a move
 void Go(int pos, int mark) {
-    board[pos - 1] = mark;  // Update board
+    board[pos - 1] = mark; // Update the board
     display_table();
     turn++;
-}
-
-// Strategy-based function to determine the computer's move
-int make2() {
-    if (board[4] == 2) return 5;  // Center square
-    if (board[0] == 2) return 1;  // Corner square
-    if (board[2] == 2) return 3;
-    if (board[6] == 2) return 7;
-    if (board[8] == 2) return 9;
-    return 0;  // No strategic move found
-}
-
-// Function to get the computer's move
-int get_computer_move() {
-    // If computer can win
-    int move = posswin(5);  // 5 is 'O' (computer)
-    if (move) return move;
-
-    // If player can win, block them
-    move = posswin(3);  // 3 is 'X' (user)
-    if (move) return move;
-
-    // Strategy for first few moves
-    if (turn == 2) {
-        return make2();
-    }
-
-    // Otherwise, take the next available square
-    for (int i = 0; i < 9; ++i) {
-        if (board[i] == 2) {
-            return i + 1;
-        }
-    }
-
-    return -1;  // Shouldn't happen
 }
 
 int main() {
     srand(time(0));
 
-    // Initialize the board with empty spaces (2 for empty, 3 for X, 5 for O)
+    // Initialize the board with empty spaces
     for (int i = 0; i < 9; ++i)
         board[i] = 2;
 
-    cout << "\nTic Tac Toe - Computer vs User\n\n";
+    cout << "\nTic Tac Toe - User (O) vs Computer (X)\n\n";
     display_table();
     cout << '\n';
 
-    char userMark = 'X', computerMark = 'O';
-    bool userFirst = true;
-    
-    // Ask the user if they want to go first
+    // Ask if the user wants to go first
     cout << "Do you want to go first? (y/n): ";
     char choice;
     cin >> choice;
-    if (choice == 'n' || choice == 'N') {
-        userFirst = false;
-    }
+    bool userFirst = (choice == 'y' || choice == 'Y');
 
     bool tie = true;
     int pos;
-    
-    // Main game loop for 9 possible moves
-    for (int i = 0; i < 9; ++i) {
-        int playerNum = (userFirst ? i % 2 : (i + 1) % 2);  
-        char mark = (playerNum == 0 ? userMark : computerMark);
 
-        if (playerNum == 0) {
+    // Game loop for 9 possible moves
+    for (int i = 0; i < 9; ++i) {
+        if ((i % 2 == 0) == userFirst) {
             // User's turn
-            cout << mark << " (User), it's your turn. Enter position (1-9): ";
+            cout << "O (User), it's your turn. Enter position (1-9): ";
             while (true) {
                 cin >> pos;
-                
                 if (pos < 1 || pos > 9 || board[pos - 1] != 2) {
                     cout << "Invalid position, try again: ";
-                    continue;
                 } else {
                     break;
                 }
             }
-            Go(pos, 3);  // Mark 'X' as 3
+            Go(pos, 3); // Mark 'O'
         } else {
             // Computer's turn
-            cout << mark << " (Computer) is making a move...\n";
+            cout << "X (Computer) is making a move...\n";
             pos = get_computer_move();
-            Go(pos, 5);  // Mark 'O' as 5
+            Go(pos, 5); // Mark 'X'
         }
 
-        // Check if the current player has won
-        if (check_winner(playerNum + 1)) {
-            cout << mark << " is the victor!\n";
+        // Check for a winner
+        if (check_winner(5)) {
+            cout << "X (Computer) wins!\n";
+            tie = false;
+            break;
+        } else if (check_winner(3)) {
+            cout << "O (User) wins!\n";
             tie = false;
             break;
         }
@@ -175,6 +188,6 @@ int main() {
     if (tie) {
         cout << "It's a tie!\n";
     }
-    
+
     return 0;
 }
